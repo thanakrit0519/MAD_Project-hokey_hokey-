@@ -63,6 +63,11 @@ uint32_t count;
 HAL_StatusTypeDef status;
 
 void doMotor();
+
+uint8_t mode = 0;
+char ch;
+uint8_t pWin = 0;
+
 uint8_t playState = 0;
 uint8_t isDrawButton = 0;
 
@@ -75,6 +80,10 @@ uint16_t lastHp = 0;
 uint32_t countPlayTime = 1;
 uint32_t lastCountPlayTime = 0;
 uint32_t lastCountTime = 0;
+
+uint16_t p2Score;
+char fromP2[20] = "";
+uint8_t k = 0;
 
 uint32_t debounceSw = 0;
 /* USER CODE END PV */
@@ -358,6 +367,7 @@ void state2() {
 				playState = 4;
 				isDrawButton = 0;
 				lastHp = -1;
+				mode = 1;
 				char str[20];
 				sprintf(str, "1 %d", Hp);
 				while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
@@ -423,6 +433,7 @@ void state3() {
 				Hp = 0;
 				lastHp = -1;
 				countPlayTime = countPlayTime * 60;
+				mode = 2;
 				char str[20];
 				sprintf(str, "2 %d", countPlayTime);
 				while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
@@ -466,7 +477,11 @@ void state4() {
 		lastHp = Hp;
 	}
 	if (Hp <= 0) {
+		while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
+		}
+		HAL_UART_Transmit(&huart2, (uint8_t*) "e", 1, 100);
 		ILI9341_Fill_Screen(WHITE);
+		pWin = 2;
 		playState = 6;
 	}
 }
@@ -515,14 +530,20 @@ void state5() {
 		ILI9341_Draw_Text(str, 138 + x, 162, WHITE, 4, BLACK);
 		lastHp = Hp;
 	}
-	if (countPlayTime <= 0) {
-		ILI9341_Fill_Screen(WHITE);
-		playState = 6;
-	}
+//	if (countPlayTime <= 0) {
+////		ILI9341_Fill_Screen(WHITE);
+////		playState = 6;
+//	}
 
 }
 void state6() {
-	ILI9341_Draw_Text("win", 100, 100, BLACK, 4, WHITE);
+	if (pWin == 2) {
+		ILI9341_Draw_Text("player 2 win", 100, 100, BLACK, 4, WHITE);
+	} else if (pWin == 1) {
+		ILI9341_Draw_Text("player 1 win", 100, 100, BLACK, 4, WHITE);
+	} else if (pWin == 3) {
+		ILI9341_Draw_Text("Draw", 100, 100, BLACK, 4, WHITE);
+	}
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == GPIO_PIN_7) {
@@ -531,6 +552,46 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				Hp--;
 				debounceSw = count;
 			}
+		}
+	}
+}
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+
+	if (huart == &huart2) {
+		HAL_UART_Receive_IT(&huart2, (uint8_t*) &ch, 1);
+		if (mode == 1) {
+			if (ch == 'e') {
+				pWin = 1;
+				playState = 6;
+			}
+		} else if (mode == 2) {
+			if (ch == '\n') {
+				unit8_t i = 0, result = 0;
+				for (i = 0; i < k; i++) {
+					result = result * 10 + (fromP2[i] - '0');
+				}
+				if (Hp > result) {
+					pWin = 1;
+					playState = 6;
+					while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
+					}
+					HAL_UART_Transmit(&huart2, (uint8_t*) "1", 1, 100);
+				} else if (Hp < result) {
+					pWin = 2;
+					playState = 6;
+					while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
+					}
+					HAL_UART_Transmit(&huart2, (uint8_t*) "2", 1, 100);
+				} else {
+					pWin = 3;
+					playState = 6;
+					while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
+					}
+					HAL_UART_Transmit(&huart2, (uint8_t*) "3", 1, 100);
+				}
+			}
+			fromP2[k] = ch;
+			k++;
 		}
 	}
 }

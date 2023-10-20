@@ -100,6 +100,10 @@ void Error_Handler(void);
 #define CS_GPIO_Port GPIOC
 #define DC_Pin GPIO_PIN_9
 #define DC_GPIO_Port GPIOC
+#define limitSwR_Pin GPIO_PIN_8
+#define limitSwR_GPIO_Port GPIOA
+#define limitSwL_Pin GPIO_PIN_9
+#define limitSwL_GPIO_Port GPIOA
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
@@ -116,10 +120,6 @@ void Error_Handler(void);
 #define stepMotor_GPIO_Port GPIOD
 #define dirMotor_Pin GPIO_PIN_4
 #define dirMotor_GPIO_Port GPIOD
-#define leftLimitSw_Pin GPIO_PIN_5
-#define leftLimitSw_GPIO_Port GPIOD
-#define rightLimitSw_Pin GPIO_PIN_6
-#define rightLimitSw_GPIO_Port GPIOD
 #define RMII_TX_EN_Pin GPIO_PIN_11
 #define RMII_TX_EN_GPIO_Port GPIOG
 #define RMII_TXD0_Pin GPIO_PIN_13

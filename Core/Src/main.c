@@ -74,6 +74,8 @@ uint16_t Hp = 1;
 uint16_t lastHp = 0;
 uint32_t countPlayTime = 1;
 uint32_t lastCountPlayTime = 0;
+uint32_t lastCountTime = 0;
+
 uint32_t debounceSw = 0;
 /* USER CODE END PV */
 
@@ -128,6 +130,7 @@ int main(void) {
 	MX_I2C1_Init();
 	MX_TIM2_Init();
 	MX_ADC1_Init();
+	MX_USART2_UART_Init();
 	/* USER CODE BEGIN 2 */
 	ILI9341_Init(); //initial driver setup to drive ili9341
 	ILI9341_Fill_Screen(WHITE);
@@ -151,12 +154,13 @@ int main(void) {
 			state3();
 		} else if (playState == 4) {
 			state4();
+			play();
 		} else if (playState == 5) {
 			state5();
+			play();
+		} else if (playState == 6) {
+			state6();
 		}
-		else if (playState == 6) {
-					state6();
-				}
 
 	}
 	/* USER CODE END 3 */
@@ -210,8 +214,9 @@ void SystemClock_Config(void) {
 	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_6) != HAL_OK) {
 		Error_Handler();
 	}
-	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART3
-			| RCC_PERIPHCLK_I2C1 | RCC_PERIPHCLK_CLK48;
+	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART2
+			| RCC_PERIPHCLK_USART3 | RCC_PERIPHCLK_I2C1 | RCC_PERIPHCLK_CLK48;
+	PeriphClkInitStruct.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
 	PeriphClkInitStruct.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
 	PeriphClkInitStruct.I2c1ClockSelection = RCC_I2C1CLKSOURCE_PCLK1;
 	PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48SOURCE_PLL;
@@ -241,8 +246,8 @@ void play() {
 	delayStep = (int) (((float) adc_val / 4095) * 2000) + 500;
 	uint8_t readSw1 = HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_0);
 	uint8_t readSw2 = HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_1);
-	uint8_t readLimitSw1 = HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_5);
-	uint8_t readLimitSw2 = HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_6);
+	uint8_t readLimitSw1 = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8);
+	uint8_t readLimitSw2 = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9);
 	if (readSw1 == 0 && readLimitSw1 != 1) {
 		stepsPerRevolution = 8;
 		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, 1);
@@ -353,6 +358,11 @@ void state2() {
 				playState = 4;
 				isDrawButton = 0;
 				lastHp = -1;
+				char str[20];
+				sprintf(str, "1 %d", Hp);
+				while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
+				}
+				HAL_UART_Transmit(&huart2, (uint8_t*) str, strlen(str), 100);
 				ILI9341_Fill_Screen(WHITE);
 			}
 			if (sqrt(pow(x_pos - 70, 2) + pow(y_pos - 115, 2)) <= 30) {
@@ -412,6 +422,12 @@ void state3() {
 				isDrawButton = 0;
 				Hp = 0;
 				lastHp = -1;
+				countPlayTime = countPlayTime * 60;
+				char str[20];
+				sprintf(str, "2 %d", countPlayTime);
+				while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
+				}
+				HAL_UART_Transmit(&huart2, (uint8_t*) str, strlen(str), 100);
 				ILI9341_Fill_Screen(WHITE);
 			}
 			if (sqrt(pow(x_pos - 55, 2) + pow(y_pos - 115, 2)) <= 30) {
@@ -455,6 +471,54 @@ void state4() {
 	}
 }
 void state5() {
+	if (isDrawButton == 0) {
+		ILI9341_Set_Rotation(SCREEN_HORIZONTAL_1);
+		ILI9341_Draw_Text("time", 125, 35, BLACK, 3, WHITE);
+		ILI9341_Draw_Text("your score", 70, 135, BLACK, 3, WHITE);
+		isDrawButton = 1;
+	}
+	if (lastCountPlayTime != countPlayTime) {
+		uint8_t min = countPlayTime / 60;
+		uint8_t sec = countPlayTime - (((int) (countPlayTime / 60)) * 60);
+		char str[20];
+		ILI9341_Draw_Rectangle(75, 60, 170, 40, BLACK);
+		sprintf(str, "%d", min);
+		uint8_t x = 0;
+		if (strlen(str) == 1) {
+			ILI9341_Draw_Text("0", 108, 62, WHITE, 4, BLACK);
+			x = 27;
+		}
+		ILI9341_Draw_Text(str, 108 + x, 62, WHITE, 4, BLACK);
+		ILI9341_Draw_Text(":", 162, 62, WHITE, 4, BLACK);
+		sprintf(str, "%d", sec);
+		x = 0;
+		if (strlen(str) == 1) {
+			ILI9341_Draw_Text("0", 173, 62, WHITE, 4, BLACK);
+			x = 27;
+		}
+		ILI9341_Draw_Text(str, 173 + x, 62, WHITE, 4, BLACK);
+		lastCountPlayTime = countPlayTime;
+	}
+	if (count - lastCountTime > 100000 && countPlayTime > 0) {
+		countPlayTime--;
+		lastCountTime = count;
+	}
+	if (lastHp != Hp) {
+		char str[20];
+		ILI9341_Draw_Rectangle(120, 160, 80, 40, BLACK);
+		sprintf(str, "%d", Hp);
+		uint8_t x = 0;
+		if (strlen(str) == 1) {
+			ILI9341_Draw_Text("0", 138, 162, WHITE, 4, BLACK);
+			x = 27;
+		}
+		ILI9341_Draw_Text(str, 138 + x, 162, WHITE, 4, BLACK);
+		lastHp = Hp;
+	}
+	if (countPlayTime <= 0) {
+		ILI9341_Fill_Screen(WHITE);
+		playState = 6;
+	}
 
 }
 void state6() {
@@ -463,7 +527,7 @@ void state6() {
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == GPIO_PIN_7) {
 		if (playState == 4) {
-			if (count - debounceSw > 200) {
+			if (count - debounceSw > 20000) {
 				Hp--;
 				debounceSw = count;
 			}

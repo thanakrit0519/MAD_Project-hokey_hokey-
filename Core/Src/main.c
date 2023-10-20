@@ -547,9 +547,16 @@ void state6() {
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == GPIO_PIN_7) {
-		if (playState == 4) {
+		if (mode == 1) {
 			if (count - debounceSw > 20000) {
 				Hp--;
+				debounceSw = count;
+			}
+		} else if (mode == 2) {
+			if (count - debounceSw > 20000) {
+				while (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == RESET) {
+				}
+				HAL_UART_Transmit(&huart2, (uint8_t*) "h", 1, 100);
 				debounceSw = count;
 			}
 		}
@@ -566,7 +573,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			}
 		} else if (mode == 2) {
 			if (ch == '\n') {
-				unit8_t i = 0, result = 0;
+				uint8_t i = 0, result = 0;
 				for (i = 0; i < k; i++) {
 					result = result * 10 + (fromP2[i] - '0');
 				}
